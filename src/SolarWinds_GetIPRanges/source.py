@@ -89,19 +89,21 @@ def collect_ranges(swis, page_token, max_results, dns_servers, dns_domain):
     result = []
     if paginator != "" and len(response["results"]) > 0:
         for subnet in response["results"]:
-            count = 2 ** (32 - int(subnet["CIDR"])) # number of IP in subnet
+            CIDR = int(subnet["CIDR"])
+            count = 2 ** (32 - cidr) # number of IP in subnet
             network_id = "network/%d:%s/%d/%s" % \
                 (subnet["SubnetID"], subnet["Address"], subnet["CIDR"], subnet["FriendlyName"])
+            sanitized_cidr_ip = ip_sanitizer(subnet["Address"], CIDR)
             net_range = {
                 "id": network_id,
                 "name": subnet["FriendlyName"],
-                "startIPAddress": get_next_ip(subnet["Address"], 2),
-                "endIPAddress": get_next_ip(subnet["Address"], count - 2),
+                "startIPAddress": get_first_usable_ip(sanitized_cidr_ip, CIDR),
+                "endIPAddress": get_last_usable_ip(sanitized_cidr_ip, CIDR),
                 "description": subnet["Comments"],
                 "ipVersion": "IPv4",
                 "addressSpaceId": "default",
                 "subnetPrefixLength": subnet["CIDR"],
-                "gatewayAddress": get_next_ip(subnet["Address"], 1),
+                "gatewayAddress": get_gateway_ip(sanitized_cidr_ip, CIDR),
                 "domain": dns_domain,
                 "dnsServerAddresses": [dns_servers],
                 "dnsSearchDomains": [dns_domain],
@@ -120,16 +122,110 @@ def collect_ranges(swis, page_token, max_results, dns_servers, dns_domain):
             result.append(net_range)
     return result, next_page_token
 
+def ip_sanitizer(proposed_cidr_ip_address, CIDR):
+    ip_parts = proposed_cidr_ip_address.split(".")
 
-def get_next_ip(ip_address, step):
-    """
-    Calculates the IP address
-    through 'step' from the initial address
-       get_next_ip("192.168.1.16", 4) -> "192.168.1.20"
-    """
+    farRightOctet = int(ip_parts[3])
+    midRightOctet = int(ip_parts[2])
+    midLeftOctet = int(ip_parts[1])
+    farLeftOctet = int(ip_parts[0])
+
+    difBits = (32 - CIDR) % 8 # "count of bits considered in left-most unfixed octet"
+    referenceBase = 2 ** difBits   # "multiple that octet will need to align to"
+
+    # First Octet [rightmost] should be multiple of referenceBase"
+    if CIDR > 24:
+        ip_parts[3] = str(farRightOctet - (farRightOctet % referenceBase))
+    # Second Octet should be multiple of referenceBase"
+    elif CIDR > 16 and CIDR <= 24:
+        ip_parts[3] = "0"
+        ip_parts[2] = str(midRightOctet - (midRightOctet % referenceBase))
+    # Third Octet should be multiple of referenceBase"
+    elif CIDR >= 8 and CIDR <= 16:
+        ip_parts[3] = "0"
+        ip_parts[2] = "0"
+        ip_parts[1] = str(midLeftOctet - (midLeftOctet % referenceBase))
+    # Fourth Octet should be multiple of referenceBase"
+    else: # "CIDR <= 8"
+        ip_parts[3] = "0"
+        ip_parts[2] = "0"
+        ip_parts[1] = "0"
+        ip_parts[0] = str(farLeftOctet - (farLeftOctet % referenceBase))
+
+    return ".".join(ip_parts)
+
+def get_gateway_ip(ip_address, CIDR):
+    # """
+    # Calculates the gateway IP address
+    # Assumes through convention that the rightmost octet will reserve ".1" as Gateway IP.
+    # """
     ip_parts = ip_address.split(".")
-    return ".".join(ip_parts[:3] + [str(int(ip_parts[3]) + step)])
 
+    # First octet [rightmost] incremented to gateway value of '1'  (cidr: /24, /25, /26, ..)
+    if CIDR > 24:
+        return ".".join(ip_parts[:3] + ["1"])
+    # Second Octet remains unchanged to match start IP - First Octet set to '1' (cidr: /23, /22, .. /16)
+    elif CIDR > 16 and CIDR <= 24:
+        return ".".join(ip_parts[:2] + [ip_parts[2]] + ["1"])
+    # Third Octet remains unchanged to match start IP - First and Second adjusted (ie. /15, /14, .. /8)
+    elif CIDR > 8 and CIDR <= 16:
+        return ".".join(ip_parts[:1] + [ip_parts[1]] + ["0.1"])
+    # Fourth Octet remains unchanged to match start IP - First, Second, Third adjusted (ie. /15, /14, .. /8) [leftmost] (ie. /7, /6, .. /0)
+    else: # "CIDR <= 8"
+        return ".".join(ip_parts[0] + ["0.0.1"])
+
+def get_first_usable_ip(ip_address, CIDR):
+    # """
+    # Calculates the first USABLE IP address
+    # Assumes through convention that the final octet will reserve ".0" as Network IP and ".1" as Gateway IP.
+    # """
+    ip_parts = ip_address.split(".")
+
+    # First octet [rightmost] incremented to usable value of '2'  (cidr: /24, /25, /26, ..)
+    if CIDR > 24:
+        return ".".join(ip_parts[:3] + ["2"])
+    # Second Octet remains unchanged to match start IP - First Octet set to '2' (cidr: /23, /22, .. /16)
+    elif CIDR > 16 and CIDR <= 24:
+        return ".".join(ip_parts[:3] + [ip_parts[2]] + ["2"])
+    # Third Octet remains unchanged to match start IP - First and Second adjusted (ie. /15, /14, .. /8)
+    elif CIDR > 8 and CIDR <= 16:
+        return ".".join(ip_parts[:1] + [ip_parts[1]] + ["0.2"])
+    # Fourth Octet remains unchanged to match start IP - First, Second, Third adjusted (ie. /15, /14, .. /8) [leftmost] (ie. /7, /6, .. /0)
+    else: # "CIDR <= 8"
+        return ".".join(ip_parts[0] + ["0.0.2"])
+
+def get_last_usable_ip(ip_address, CIDR):
+    # """
+    # Calculates the last USABLE IP address
+    # Assumes through convention that the final octet will be 254. Where 255 is reserved as the broadcast IP.
+    # """
+    ip_parts = ip_address.split(".")
+
+    difBits = (32 - CIDR) % 8 # "count of bits considered in left-most unfixed octet"
+    difValue = 2 ** difBits - 1 # "decimal delta for left-most unfixed octet"
+
+    # "First Octet adjustment [rightmost] (ie. /24, /25, /26, ..)"
+    if CIDR > 24:
+        return ".".join(ip_parts[:3] + [str(int(ip_parts[3]) + difValue)])
+    # "Second Octet adjustment (ie. /23, /22, .. /16)"
+    elif CIDR > 16 and CIDR <= 24:
+        return ".".join(ip_parts[:2] + [str(int(ip_parts[2]) + difValue)] + ["254"])
+    # "Third Octet adjustment (ie. /15, /14, .. /8)"
+    elif CIDR > 8 and CIDR <= 16:
+        return ".".join(ip_parts[:1] + [str(int(ip_parts[1]) + difValue)] + ["255.254"])
+    # "Fourth Octet adjustment [leftmost] (ie. /7, /6, .. /0)"
+    else: # "CIDR <= 8"
+        return ".".join([str(int(ip_parts[0]) + difValue)] + ["255.255.254"])
+
+
+# def get_next_ip(ip_address, step):
+#     """
+#     Calculates the IP address
+#     through 'step' from the initial address
+#        get_next_ip("192.168.1.16", 4) -> "192.168.1.20"
+#     """
+#     ip_parts = ip_address.split(".")
+#     return ".".join(ip_parts[:3] + [str(int(ip_parts[3]) + step)])
 
 def get_paginator(swis, page_token, max_result):
     """

@@ -1,0 +1,12 @@
+orionsdk-0.3.0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+orionsdk-0.3.0.dist-info/METADATA,sha256=QXguUbeavGbPrfDLel01TmbrHgDNMN_vefJMLl_WVfI,791
+orionsdk-0.3.0.dist-info/RECORD,,
+orionsdk-0.3.0.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+orionsdk-0.3.0.dist-info/WHEEL,sha256=WzZ8cwjh8l0jtULNjYq1Hpr-WCqCRgPr--TX4P5I1Wo,110
+orionsdk-0.3.0.dist-info/top_level.txt,sha256=MbhlMNTVGQTESwC3ylds96HG-wWYa0_Ay9yW_M2Gbjs,9
+orionsdk/__init__.py,sha256=-edlxBKkPoUZkSDhWaTpQ9PgIq8RIneNAd3MbBMwaPo,722
+orionsdk/__pycache__/__init__.cpython-37.pyc,,
+orionsdk/__pycache__/solarwinds.cpython-37.pyc,,
+orionsdk/__pycache__/swisclient.cpython-37.pyc,,
+orionsdk/solarwinds.py,sha256=hiaNjfjFTITMMkyQG3eTEyfsV3jeN3LcM7zO8Nf5ZCs,35647
+orionsdk/swisclient.py,sha256=RPWUqyvO6iDLcIxMBBKXNxhEcoORzfHh0O31BAVXpRA,2105
