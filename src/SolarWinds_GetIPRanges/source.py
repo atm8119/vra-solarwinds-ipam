@@ -145,7 +145,7 @@ def ip_sanitizer(proposed_cidr_ip_address, CIDR):
         ip_parts[2] = "0"
         ip_parts[1] = str(midLeftOctet - (midLeftOctet % referenceBase))
     # Fourth Octet should be multiple of referenceBase"
-    elif CIDR <= 8:
+    elif CIDR <= 8 and CIDR > 0:
         ip_parts[3] = "0"
         ip_parts[2] = "0"
         ip_parts[1] = "0"
@@ -174,8 +174,8 @@ def get_gateway_ip(ip_address, CIDR):
     elif CIDR <= 16 and CIDR > 8:
         return ".".join(ip_parts[:1] + [ip_parts[1]] + ["0.1"])
     # Fourth Octet remains unchanged to match start IP - First, Second, Third set to 0.0.0 then incremented by '1' (ie. /15, /14, .. /8) [leftmost] (ie. /7, /6, .. /0)
-    elif CIDR <= 8:
-        return ".".join(ip_parts[0] + ["0.0.1"])
+    elif CIDR <= 8 and CIDR > 0:
+        return ".".join([ip_parts[0]] + ["0.0.1"])
     else:
         raise ValueError("CIDR Block of size "+str(CIDR)+" is not valid.")
 
@@ -191,13 +191,13 @@ def get_first_usable_ip(ip_address, CIDR):
         return ".".join(ip_parts[:3] + [str(int(ip_parts[3]) + 2)])
     # Second Octet remains unchanged to match start IP - First Octet set to 0 then incremented to '2' (cidr: /23, /22, .. /16)
     elif CIDR <= 24 and CIDR > 16:
-        return ".".join(ip_parts[:3] + [ip_parts[2]] + ["2"])
+        return ".".join(ip_parts[:2] + [ip_parts[2]] + ["2"])
     # Third Octet remains unchanged to match start IP - First and Second set to 0.0 then incremented by '2' (ie. /15, /14, .. /8)
     elif CIDR <= 16 and CIDR > 8:
-        return ".".join(ip_parts[:1] + [ip_parts[1]] + ["0.2"])
+        return ".".join([ip_parts[0]] + [ip_parts[1]] + ["0.2"])
     # Fourth Octet remains unchanged to match start IP - First, Second, Third set to 0.0.0 then incremented by '2' (ie. /15, /14, .. /8) [leftmost] (ie. /7, /6, .. /0)
-    elif CIDR <= 8:
-        return ".".join(ip_parts[0] + ["0.0.2"])
+    elif CIDR <= 8 and CIDR > 0:
+        return ".".join([ip_parts[0]] + ["0.0.2"])
     else:
         raise ValueError("CIDR Block of size "+str(CIDR)+" is not valid.")
 
@@ -212,18 +212,19 @@ def get_last_usable_ip(ip_address, CIDR):
     difValue = 2 ** difBits - 1 # "decimal delta for left-most unfixed octet"
 
     # "First Octet adjustment [rightmost] (ie. /24, /25, /26, ..)"
-    if CIDR > 24:
+    if CIDR <=30 and CIDR > 24:
         return ".".join(ip_parts[:3] + [str(int(ip_parts[3]) + difValue)])
     # "Second Octet adjustment (ie. /23, /22, .. /16)"
     elif CIDR <= 24 and CIDR > 16:
         return ".".join(ip_parts[:2] + [str(int(ip_parts[2]) + difValue)] + ["254"])
     # "Third Octet adjustment (ie. /15, /14, .. /8)"
     elif CIDR <= 16 and CIDR > 8 :
-        return ".".join(ip_parts[:1] + [str(int(ip_parts[1]) + difValue)] + ["255.254"])
+        return ".".join([ip_parts[0]] + [str(int(ip_parts[1]) + difValue)] + ["255.254"])
     # "Fourth Octet adjustment [leftmost] (ie. /7, /6, .. /0)"
-    else: # "CIDR <= 8"
+    elif CIDR <= 8 and CIDR > 0:
         return ".".join([str(int(ip_parts[0]) + difValue)] + ["255.255.254"])
-
+    else:
+        raise ValueError("CIDR Block of size "+str(CIDR)+" is not valid.")
 
 # def get_next_ip(ip_address, step):
 #     """
